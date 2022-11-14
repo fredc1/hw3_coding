@@ -54,11 +54,14 @@ def edge_score(grid):
 			if arr[r][c] > arr[a][b]:
 				max_tile = (a,b)
 	r,c = max_tile
+	score = 0
 	if r==0 or r==3 or c==0 or c==3:
-		return 4
-	else:
-		return 0
-
+		score += 2
+	if (r,c) in [(0,0), (0,3), (3,0),(3,3)]:
+		score += 2 
+	return score
+# no score 2, 1, 1, 1, 1, 1
+# score 1, 1, 
 def mono_score(grid):
 	arr = grid.map 
 	score = 0
@@ -66,7 +69,7 @@ def mono_score(grid):
 		trans = []
 		
 		for i in range(len(row)):
-			if i + 1 < 4:
+			if i + 1 < 4 and row[i+1] != 0:
 				v = row[i+1] - row[i]
 				if v==0: trans.append(0)
 				else: trans.append(v/v)
@@ -82,10 +85,54 @@ def mono_score(grid):
 		score += int(trans[0]==trans[1]) + int(trans[1]==trans[2])
 	return score
 
+
+def next_nonzero_entry(b, p, d):
+	(r, c) = p
+	if d=='row':
+		while c < 3:
+			c += 1
+			v = b[r][c]
+			if v != 0:
+				return r, c, v
+		return None, None, None
+
+	while r < 3:
+		r += 1
+		v = b[r][c]
+		if v != 0:
+			return r,c,v
+
+	return None, None, None
+
+
+def smooth_score(grid):
+	arr = grid.map 
+	volatility = 0
+	for r in range(len(arr)):
+		for c, v in enumerate(arr[r]):
+			if v==0:
+				continue
+			i,j,nv = next_nonzero_entry(arr,(r,c),'row')
+			if nv is not None:
+				volatility += abs(math.log(nv,2) - math.log(v,2))
+	for c in range(len(arr)):
+		for r in range(len(arr)):
+			v = arr[r][c]
+			if v==0:
+				continue
+			i,j,nv = next_nonzero_entry(arr,(r,c),'col')
+			if nv is not None:
+				volatility += abs(math.log(nv,2) - math.log(v,2))
+
+	return -1*volatility
+
+
+
+
 def heuristic(grid):
 	score = grid.getMaxTile()
 	score = int(math.log(score, 2))
-	return 2*score  + 3*len(grid.getAvailableCells())  + edge_score(grid) + merge_score(grid)
+	return score + 3*len(grid.getAvailableCells())  + 2*edge_score(grid) + smooth_score(grid)
 
 
 class EMMState:
@@ -127,7 +174,7 @@ def maximizer(state, alpha, beta, maxd, st):
 
 	succs = state.max_successors()
 	if len(succs) == 0:
-		return state.move, state.h, False
+		return state.move, 0, False
 
 	succs.sort(key=(lambda s: s.h), reverse=True)
 
@@ -190,15 +237,20 @@ class IntelligentAgent(BaseAI):
 		state = EMMState(grid, 0)
 		best_move = -1
 		depth = 1
-		while (time.process_time() - start_time) < 0.2:
+		called_max = 0
+		while (time.process_time() - start_time) <= 0.2:
 			move, score, short = maximizer(state, alpha=-1.0, beta=math.inf, maxd=depth, st=start_time)
-
+			called_max = 1
 			if short:
 				break
 				print(f"shorted on depth {depth}")
 			else:
 				best_move = move
 				depth += 1
-
+		if best_move == -1:
+			s = time.process_time()
+			state = EMMState(grid, 0)
+			f = time.process_time()
+			print(f"TIME TOO LONG FOR H: {f-s > 0.2} called max: {called_max}")
 		return best_move
 		

@@ -104,7 +104,7 @@ class GameManager:
             self.displayer.display(self.grid)
 
             # Exceeding the Time Allotted for Any Turn Terminates the Game
-            #self.updateAlarm()
+            self.updateAlarm()
             turn = 1 - turn
 
         return self.grid.getMaxTile()
